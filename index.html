@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Checklist Kerja & Ganti Oli Motor</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+body{
+    font-family:'Roboto', sans-serif;
+    background:#f4f6f8;
+    margin:0;
+    display:flex;
+    justify-content:center;
+    padding:20px;
+}
+.app{
+    max-width:600px; width:100%;
+}
+.header{text-align:center; margin-bottom:20px;}
+.header h1{color:#00796b; margin:0;}
+.header p{color:#004d40; margin:2px 0 0 0;}
+.card{
+    background:white; padding:15px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); margin-bottom:20px;
+}
+table{width:100%; border-collapse:collapse; font-size:14px;}
+th,td{padding:10px; border-radius:6px; text-align:center; transition: background 0.5s, color 0.5s;}
+th{background:#80deea; color:#004d40;}
+.green{background:#c8e6c9;}
+.red{background:#ef9a9a;}
+.yellow{background:#fff59d;}
+.blue{background:#bbdefb;}
+button.toggleBtn{
+    padding:8px 12px; border:none; border-radius:8px; cursor:pointer; font-weight:500;
+}
+.btnArsip{background:#00796b; color:white; margin-top:10px; display:block; width:100%;}
+.modal{
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5);
+    justify-content:center; align-items:center; z-index:100;
+}
+.modal-content{
+    background:white; padding:15px; border-radius:12px; max-width:95%; max-height:85%; overflow:auto;
+}
+.modal-header{font-weight:bold; font-size:16px; margin-bottom:10px;}
+.modal-close{float:right; cursor:pointer; color:#00796b; font-weight:bold;}
+.arsip-table{width:100%; border-collapse:collapse; margin-top:10px;}
+.arsip-table th, .arsip-table td{border:1px solid #b2dfdb; padding:6px; text-align:center;}
+.arsip-table th{background:#80deea; color:#004d40;}
+</style>
+</head>
+<body>
+<div class="app">
+    <div class="header">
+        <h1>Checklist Kerja & Ganti Oli</h1>
+        <p>Motor: Jupiter MX New | Perjalanan Kerja 100 KM</p>
+    </div>
+
+    <div class="card">
+        <table>
+            <thead>
+                <tr>
+                    <th>Tanggal</th>
+                    <th>Masuk</th>
+                    <th>KM</th>
+                    <th>Status Oli</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+        <button class="btnArsip" onclick="openModalArsip()">📂 Lihat Arsip</button>
+    </div>
+
+    <div style="text-align:center; font-size:10px; color:#777;">&copy; 2026 Zulfahmi Afnula. All rights reserved.</div>
+</div>
+
+<div class="modal" id="modalArsip">
+    <div class="modal-content">
+        <span class="modal-close" onclick="closeModalArsip()">×</span>
+        <div class="modal-header">Arsip 60 Hari</div>
+        <div id="arsipContent"></div>
+    </div>
+</div>
+
+<script>
+const KM_PER_HARI = 100;
+const OLI_INTERVAL_HARI = 30;
+const keyData = "kerjaOliData";
+let data = JSON.parse(localStorage.getItem(keyData)) || {records:[], archives:[], lastOli: null};
+
+function formatDate(d){ return d.toISOString().slice(0,10); }
+function parseDate(s){ return new Date(s+"T00:00:00"); }
+
+function initRecords(){
+    let todayStr = formatDate(new Date());
+    if(!data.records.some(r=>r.date===todayStr)){
+        data.records.push({date:todayStr, berangkat:false, km:0});
+        saveData();
+    }
+}
+
+function saveData(){ localStorage.setItem(keyData, JSON.stringify(data)); }
+
+function toggleBerangkat(date){
+    let rec = data.records.find(r=>r.date===date);
+    rec.berangkat = !rec.berangkat;
+    rec.km = rec.berangkat ? KM_PER_HARI : 0;
+    saveData();
+    updateTable();
+}
+
+function getLastOliDate(){ return data.lastOli || formatDate(new Date()); }
+function gantiOli(){
+    data.lastOli = formatDate(new Date());
+    saveData();
+    alert("✅ Oli diganti, siklus 30 hari berikutnya dimulai hari ini.");
+}
+
+function archiveOldRecords(){
+    let cutoff = new Date();
+    cutoff.setDate(cutoff.getDate()-60);
+    let archives = data.records.filter(r=>parseDate(r.date)<cutoff);
+    if(archives.length>0){
+        data.archives.push(...archives);
+        data.records = data.records.filter(r=>parseDate(r.date)>=cutoff);
+        saveData();
+    }
+}
+
+function updateTable(){
+    const tbody = document.getElementById("tableBody");
+    tbody.innerHTML="";
+    const todayStr = formatDate(new Date());
+    const lastOliDate = getLastOliDate();
+
+    data.records.forEach(r=>{
+        const tr = document.createElement("tr");
+        let kelasHari = (r.date===todayStr) ? "blue" : "";
+
+        // Status oli
+        let statusOli = "";
+        let daysSinceLastOli = (parseDate(r.date)-parseDate(lastOliDate))/(1000*60*60*24);
+        if(daysSinceLastOli>=OLI_INTERVAL_HARI-3 && daysSinceLastOli<OLI_INTERVAL_HARI){
+            statusOli = "⚠️ 3 hari ke depan ganti oli";
+        } else if(daysSinceLastOli>=OLI_INTERVAL_HARI){
+            statusOli = "🚨 Segera ganti oli!";
+        }
+
+        tr.innerHTML = `<td class="${kelasHari}">${r.date}</td>
+                        <td></td>
+                        <td>${r.km}</td>
+                        <td>${statusOli}</td>`;
+
+        let btn = document.createElement("button");
+        btn.className="toggleBtn";
+        btn.textContent = r.berangkat ? "Iya" : "Tidak";
+        btn.style.backgroundColor = r.berangkat ? "#c8e6c9" : "#ef9a9a";
+        btn.onclick = ()=>toggleBerangkat(r.date);
+        tr.children[1].appendChild(btn);
+
+        tbody.appendChild(tr);
+    });
+}
+
+function openModalArsip(){
+    archiveOldRecords();
+    const modal = document.getElementById("modalArsip");
+    const content = document.getElementById("arsipContent");
+    modal.style.display="flex";
+    content.innerHTML="";
+    if(data.archives.length===0){ content.textContent="Belum ada arsip."; return; }
+
+    let tbl = document.createElement("table");
+    tbl.className="arsip-table";
+    let thead = document.createElement("thead");
+    thead.innerHTML="<tr><th>Tanggal</th><th>Masuk</th><th>KM</th><th>Status Oli</th></tr>";
+    tbl.appendChild(thead);
+    let tbody = document.createElement("tbody");
+    data.archives.forEach(r=>{
+        let daysSinceLastOli = (parseDate(r.date)-parseDate(getLastOliDate()))/(1000*60*60*24);
+        let statusOli = "";
+        if(daysSinceLastOli>=OLI_INTERVAL_HARI-3 && daysSinceLastOli<OLI_INTERVAL_HARI){
+            statusOli = "⚠️ 3 hari ke depan ganti oli";
+        } else if(daysSinceLastOli>=OLI_INTERVAL_HARI){
+            statusOli = "🚨 Segera ganti oli!";
+        }
+        let tr = document.createElement("tr");
+        tr.innerHTML=`<td>${r.date}</td><td>${r.berangkat?"Iya":"Tidak"}</td><td>${r.km}</td><td>${statusOli}</td>`;
+        tbody.appendChild(tr);
+    });
+    tbl.appendChild(tbody);
+    content.appendChild(tbl);
+}
+function closeModalArsip(){ document.getElementById("modalArsip").style.display="none"; }
+
+initRecords();
+updateTable();
+setInterval(()=>{
+    initRecords();
+    updateTable();
+},60000);
+</script>
+</body>
+</html>
